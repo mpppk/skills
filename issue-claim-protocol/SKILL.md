@@ -24,6 +24,8 @@ allowed-agents: claude-code
 
 したがって**エージェントは Project API を呼ばない**。Projectは Issue/PR の状態から automation で自動投入され、人間が全リポジトリの状況を1画面で見るためだけに存在する。反映は遅延するので、**Projectの表示を見て「このIssueは空いている」と判断してはいけない**。構築手順は [project-setup.md](project-setup.md)。
 
+Projectに載るのは `CLAIM_LABEL` が付いたIssueとPRで、**Statusは `Todo` / `Done` しか自動では動かない**。GitHubのbuilt-in workflowにはPRがopenされた時にStatusを変えるものが無く、PRに紐づくIssueへ作用するものも無いため、エージェントが書かない構成では中間状態を機械的に付けられない。進行中の詳細な状態は、Project上のStatusではなく**PR descriptionのclaimメタデータを読む**。
+
 ## When to use
 
 - 「重要度の高いIssueを順次解決して」のように、複数セッションでIssueを並行処理するとき
@@ -90,7 +92,7 @@ allowed-agents: claude-code
 ## claimの確立（早期Draft PR）
 
 1. 可能なら `CLAIM_LABEL` ラベルをIssueに付与する（なければ・権限がなければ省略可）。
-2. ブランチを作り、最初の小さなコミット（計画のみ・空実装でも可）をpushして、**実装を進める前に直ちにDraft PRを作成**する。本文に `Closes #N` と後述のclaimメタデータを含める。PRを作業の最後に作る運用では「着手〜PR作成」の間が無防備になり、リンクPRチェックが機能しない。
+2. ブランチを作り、最初の小さなコミット（計画のみ・空実装でも可）をpushして、**実装を進める前に直ちにDraft PRを作成**する。本文に `Closes #N` と後述のclaimメタデータを含め、**Draft PRにも `CLAIM_LABEL` ラベルを付ける**。PRを作業の最後に作る運用では「着手〜PR作成」の間が無防備になり、リンクPRチェックが機能しない。PR側にもラベルを付けるのは、後述の横断検索がPRをラベルで引くためと、Projectのauto-add workflowがラベル駆動のため。Issueにしか付けないと、どちらも空振りする。
 3. **Draft PR作成後、同一Issueにリンクされた open PR を再取得**し、自分より作成時刻の早いPRが存在したら、自分のDraft PRをその旨を本文に記してクローズし、ラベルを外して次の候補Issueへ移る（claim-then-verify。作成時刻はGitHubがサーバ側で採番するため順序が確定する）。
 4. `CLAIM_SCOPE` 定義時は、3と同時に**resourceの衝突も再確認**する。同じresourceを持つ、自分より早いPRが存在したら同様に撤退する。
 
@@ -112,7 +114,7 @@ PR本文の末尾に以下のセクションを置き、**作業の節目（実�
 
 - `executor` は「どのエージェントのどのインスタンスが持っているか」。同じエージェント種別の別インスタンスと区別が付くので、stale回収時の判断材料になる
 - `resource` は**1行1件**。横断検索にそのまま引っかかる形にするため、複数をカンマで並べない
-- `status` は Project の Status と同じ語彙を使う: `Claiming` / `In Progress` / `Review` / `Blocked` / `Done` / `Abandoned`。エージェントが書くのはPR本文だけで、Project側のStatusはautomationが付ける
+- `status` の語彙は `Claiming` / `In Progress` / `Review` / `Blocked` / `Done` / `Abandoned`。**これはPR description上だけの値で、ProjectのStatusフィールドとは別物**。Project側は `Todo` / `Done` しか持たない（理由は「3つの層」を参照）ので、中間状態を知りたい他セッションと人間はこの行を読む
 - 実行ログはここに書かない。GitHubに残すのは claim / 重要な方針変更 / PR作成 / blocked / 終了 だけにする
 
 ## staleなclaimの回収
@@ -133,8 +135,8 @@ PRを作っただけでIssueをcloseしない。`status` を `Review` にする�
 ## 完了・撤退時の後始末
 
 - ready化の直前に、**同一Issueへの別open PR・mainへの先行マージがないかを再確認**する（長時間セッションでは着手時のチェックが陳腐化する）。
-- PRがマージ/クローズされたら `CLAIM_LABEL` ラベルを外す（`Closes #N` のauto-closeはラベルまでは外さない）。
-- 作業を断念する場合は、Draft PRに理由を記してクローズし、ラベルを外す。**黙って放置しない**。
+- PRがマージ/クローズされたら `CLAIM_LABEL` ラベルを**IssueとPRの両方から**外す（`Closes #N` のauto-closeはラベルまでは外さない）。残したままだとProjectのボードに完了済みのclaimが積み上がり、横断検索も空振りが増える。
+- 作業を断念する場合は、Draft PRに理由を記してクローズし、同じくIssueとPRの両方からラベルを外す。**黙って放置しない**。
 - 先着PRに負けて撤退する場合、閉じるのは**自分のPR**であってIssueではない。Issueは相手のclaimで生きている。
 - 重複と判明したIssueを閉じるときは、`issue_write` で `state_reason: duplicate` と `duplicate_of` を指定する。単にcloseするより、Projectからも人間からも追える。
 
