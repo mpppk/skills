@@ -2,7 +2,6 @@
 name: orca
 description: Orcaの/orchestrationでorchestrator・worker・reviewerの3ロールを協調させて実装を進めるプロトコル。workerの実装・テスト・PR作成と動作確認、reviewerのレビュー・マージ・本番確認、opencodeハーネスとモデル指定、workspace status遷移ルールを定める。「Orcaで実装して」「orchestrationを使って」のようにOrcaでの分散実装を指示された時、またはリポジトリのCLAUDE.md/AGENTS.mdでこのskillの利用が指示されている時に使う。
 ---
-
 # orca
 
 orcaが提供する/orchestrationを利用し、orchestrator, worker, reviewerの3種類のAIエージェントが協調して実装を進めます。
@@ -16,4 +15,5 @@ workerとreviewerのworkspace statusを、以下のルールで適宜orchestrato
 - 作業中のworkerはIn progressとする
 - 作業が完了してレビューを待っているworkerや、レビュー中のreviewerはIn reviewとする
 - レビューを行っていないが再利用の可能性があり待機しているreviewerはWaitingとする
-- もう利用しないworkerやreviewerはDoneとする
+- もう利用しないworkerやreviewerはDoneとして、適宜削除する
+
